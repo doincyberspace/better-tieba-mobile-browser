@@ -95,7 +95,7 @@
     try {
       document.open();
       document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>百度贴吧</title>' +
-        '<style>html,body{height:100%;margin:0;background:#f5f6f7;color:#333;font:15px/1.6 sans-serif;display:flex;align-items:center;justify-content:center;-webkit-user-select:none}</style>' +
+        '<style>html,body{height:100%;margin:0;background:#f5f6f7;color:#333;font:15px/1.6 sans-serif;display:flex;align-items:center;justify-content:center;-webkit-user-select:none}@media (prefers-color-scheme:dark){html,body{background:#0b0b0b;color:#ddd}}</style>' +
         '</head><body><div>正在加载电脑版贴吧&#8230;</div></body></html>');
       document.close();
     } catch (e) { /* 忽略 */ }
@@ -150,10 +150,10 @@
     '  .pc-pb-box,.pb-page-wrapper,.frs-page-wrap,.frs-container,.home-page-wrapper{min-width:0 !important;}',
     /* 帖子页吸顶标题条：站点是 margin-left:36px + calc(100vw - 72px)，右侧留 72px 空档，
      * 内容滚动时会从空档穿出、与标题文字重叠（"导航栏过短"）。改为与容器同宽并给白底。 */
-    '  .pc-pb-title,.pb-title-wrap{margin-left:0 !important;margin-right:0 !important;width:100% !important;max-width:100% !important;box-sizing:border-box !important;background-color:#fff !important;padding-left:10px !important;padding-right:10px !important;}',
+    '  .pc-pb-title,.pb-title-wrap{margin-left:0 !important;margin-right:0 !important;width:100% !important;max-width:100% !important;box-sizing:border-box !important;background-color:var(--cos-color-bg-raised,#fff) !important;padding-left:10px !important;padding-right:10px !important;}',
     /* 吧页吸顶标签栏：站点依赖滚动时动态加 .is-sticky 才给白底；本内核下该类不生效，
      * 导致标签栏透明、信息流从下方穿出（"导航栏不应无背景"）。直接给白底。 */
-    '  .sticky-area{background-color:#fff !important;}',
+    '  .sticky-area{background-color:var(--cos-color-bg-raised,#fff) !important;}',
     '  .pb-title-wrap{min-width:0 !important;}',
     '  .pb-title{white-space:normal !important;word-break:break-word !important;}',
     '  .action-bar-warp{flex-wrap:wrap !important;height:auto !important;left:0 !important;}',
@@ -161,6 +161,15 @@
     '  .action-item{white-space:nowrap !important;}',
     '  .pc-pb-comments-desc{flex-wrap:wrap !important;}',
     '  .comment-desc-left,.comment-desc-right{flex-wrap:wrap !important;}',
+    /* 顶栏与吸顶标题条之间不再出现 1px 亮线/色阶缝：顶栏与标题条同底色，并去掉顶栏下边框 */
+    '  .top-nav-bar{background-color:var(--cos-color-bg-raised,#fff) !important;border-bottom-color:transparent !important;}',
+    /* 顶栏(60px)与吸顶标题条是两个盒，DPR=2.75 下交界处会漏出 0.x px 的底下内容（一条亮缝）。
+     * 顶栏层级(2000)高于标题条(201)，所以在顶栏下沿补 2px 同色不透明条，把缝盖死。 */
+    '  .top-nav-bar::after{content:"";position:absolute;left:0;right:0;top:100%;height:3px;background:var(--cos-color-bg-raised,#fff);}',
+    /* 帖内导航栏（全部回复/只看楼主/排序）：站点默认只在「向上滑」时给它 top+sticky-active，
+     * 向下滑就溜走。这里改为始终吸顶，并贴在吸顶标题条下方（高度由脚本写入 --tbpc-title-h）。
+     * -1.5px 是故意让它「上钻」进标题条底部，靠标题条(201)盖住重叠部分，消除 0.27px 漏缝。 */
+    '  .pc-pb-reply-top{position:sticky !important;top:calc(var(--tbpc-title-h,51px) - 1.5px) !important;}',
     '}',
 
     /* --- 手机宽度：顶栏收敛，搜索框可正常键入 --- */
@@ -217,21 +226,22 @@
   ].join('\n');
 
   /* ---------------- 帖子内"本吧"卡片 样式 ---------------- */
+  /* 颜色一律走站点 CSS 变量（亮/暗模式各有一套），带亮色回退，避免暗色模式下白底/白块 */
   var FORUM_CARD_CSS = [
-    '#tbpc-forum-card{box-sizing:border-box;margin:12px 0 4px;padding:10px 12px;border:1px solid #e6e7eb;border-radius:10px;background:#fff;font-size:13px;line-height:1.5;color:#333;cursor:pointer;-webkit-tap-highlight-color:transparent;}',
-    '#tbpc-forum-card:hover{border-color:#c9d3ea;}',
-    '#tbpc-forum-card:active{background:#f7f8fa;}',
+    '#tbpc-forum-card{box-sizing:border-box;margin:12px 0 4px;padding:10px 12px;border:1px solid var(--cos-color-border-minor,#e6e7eb);border-radius:10px;background:var(--cos-color-bg-raised,#fff);font-size:13px;line-height:1.5;color:var(--cos-color-text,#333);cursor:pointer;-webkit-tap-highlight-color:transparent;}',
+    '#tbpc-forum-card:hover{border-color:var(--cos-color-border-minor,#c9d3ea);}',
+    '#tbpc-forum-card:active{background:var(--cos-button-color-bg,#f7f8fa);}',
     '#tbpc-forum-card .tbpc-fc-row1{display:flex;align-items:center;}',
-    '#tbpc-forum-card .tbpc-fc-avatar{flex:0 0 auto;width:40px;height:40px;border-radius:9px;object-fit:cover;background:#f2f3f5;}',
+    '#tbpc-forum-card .tbpc-fc-avatar{flex:0 0 auto;width:40px;height:40px;border-radius:9px;object-fit:cover;background:var(--cos-button-color-bg,#f2f3f5);}',
     '#tbpc-forum-card .tbpc-fc-main{flex:1 1 auto;min-width:0;margin-left:10px;}',
-    '#tbpc-forum-card .tbpc-fc-name{display:block;font-size:15px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
-    '#tbpc-forum-card .tbpc-fc-data{margin-top:2px;font-size:12px;color:#909399;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+    '#tbpc-forum-card .tbpc-fc-name{display:block;font-size:15px;font-weight:600;color:var(--cos-color-text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+    '#tbpc-forum-card .tbpc-fc-data{margin-top:2px;font-size:12px;color:var(--cos-color-text-minor,#909399);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
     '#tbpc-forum-card .tbpc-fc-data span+span{margin-left:10px;}',
-    '#tbpc-forum-card .tbpc-fc-arrow{flex:0 0 auto;margin-left:8px;color:#c0c4cc;font-size:16px;line-height:1;}',
-    '#tbpc-forum-card .tbpc-fc-meta{display:flex;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;color:#909399;}',
+    '#tbpc-forum-card .tbpc-fc-arrow{flex:0 0 auto;margin-left:8px;color:var(--cos-color-text-minor,#c0c4cc);font-size:16px;line-height:1;}',
+    '#tbpc-forum-card .tbpc-fc-meta{display:flex;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;color:var(--cos-color-text-minor,#909399);}',
     '#tbpc-forum-card .tbpc-fc-meta>*{margin-right:12px;}',
-    '#tbpc-forum-card .tbpc-fc-tag{padding:1px 6px;border-radius:4px;background:#f2f3f5;color:#666;}',
-    '#tbpc-forum-card .tbpc-fc-desc{margin-top:6px;font-size:12px;color:#666;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}'
+    '#tbpc-forum-card .tbpc-fc-tag{padding:1px 6px;border-radius:4px;background:var(--cos-button-color-bg,#f2f3f5);color:var(--cos-color-text-minor,#666);}',
+    '#tbpc-forum-card .tbpc-fc-desc{margin-top:6px;font-size:12px;color:var(--cos-color-text-minor,#666);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}'
   ].join('\n');
 
   /* ---------------- 手机版/电脑版切换 ----------------
@@ -245,7 +255,7 @@
     var b = document.createElement('button');
     b.id = 'tbpc-mobile-btn';
     b.textContent = '📱 手机版';
-    b.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:2147483647;background:#fff;border:1px solid #ccc;border-radius:16px;padding:6px 12px;font:13px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.85;';
+    b.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:2147483647;background:var(--cos-color-bg-raised,#fff);border:1px solid var(--cos-color-border-minor,#ccc);color:var(--cos-color-text,#333);border-radius:16px;padding:6px 12px;font:13px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.85;';
     b.addEventListener('click', function () {
       try { sessionStorage.setItem(KEY_OFF, '1'); } catch (e) { /* 忽略 */ }
       location.reload();
@@ -434,6 +444,29 @@
     if (desc) { descEl.textContent = desc; descEl.style.display = ''; }
   }
 
+  /* 把吸顶标题条的实际高度写进 CSS 变量，供帖内导航栏的吸顶偏移（top）使用 */
+  function syncTitleHeight() {
+    try {
+      var t = document.querySelector('.pc-pb-title');
+      if (!t) return;
+      var h = Math.round(t.getBoundingClientRect().height);
+      if (h > 0) document.documentElement.style.setProperty('--tbpc-title-h', h + 'px');
+    } catch (e) { /* 忽略 */ }
+  }
+  /* 滚动/缩放时立刻重算（每帧最多一次），比 500ms 轮询更跟手，
+   * 避免页面刚渲染完标题条高度还是旧值时，帖内导航栏贴错位置。 */
+  var titleSyncQueued = false;
+  function queueTitleSync() {
+    if (titleSyncQueued) return;
+    titleSyncQueued = true;
+    requestAnimationFrame(function () {
+      titleSyncQueued = false;
+      syncTitleHeight();
+    });
+  }
+  document.addEventListener('scroll', queueTitleSync, true);
+  window.addEventListener('resize', queueTitleSync);
+
   function ensureForumCard() {
     var isThread = location.pathname.indexOf('/p/') === 0;
     var existing = document.getElementById(CARD_ID);
@@ -481,6 +514,7 @@
 
   function tickSprite() {
     try {
+      syncTitleHeight();
       var cur = document.getElementById('__SVG_SPRITE_NODE__');
       if (cur) {
         if (!spriteCache) spriteCache = cur.cloneNode(true);
