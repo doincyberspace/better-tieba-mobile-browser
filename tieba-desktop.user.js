@@ -88,6 +88,21 @@
     } catch (e) { /* 忽略 */ }
   }.toString().replace('__UA__', DESKTOP_UA);
 
+  /**
+   * 精灵图单例复位（页面上下文执行）。
+   * 贴吧 PC 版的 svg-sprite-loader 用 window.__SVG_SPRITE__ 做单例，且 mount() 一旦
+   * isMounted（= 节点已创建）就直接早返回，不会再往文档里挂。
+   * 真机实测：同一页面会被【两份本脚本副本】先后 document.write（旧安装那份仍留着），
+   * 第二次 write 时窗口上的旧实例节点已随旧文档一起销毁，站点脚本重新执行时复用该实例
+   * → 挂载早退 → 236 个 symbol 一个不缺，但节点不在文档里，所有 <use> 引用断链，
+   * 顶栏图标全部空白。每次重写前把单例复位，站点就会重建并重新挂载精灵图。
+   * （本脚本内联在 <head> 最前面，先于站点任何脚本执行。） */
+  var SPRITE_RESET_SRC = function () {
+    'use strict';
+    try { delete window.__SVG_SPRITE__; } catch (e) { /* 忽略 */ }
+    try { window.__SVG_SPRITE__ = void 0; } catch (e) { /* 忽略 */ }
+  }.toString();
+
   /* ---------------- 占位页（页面上下文执行：替换原 wise 文档，沙箱不受影响） ---------------- */
 
   var PLACEHOLDER_SRC = function () {
@@ -222,7 +237,16 @@
     '  .dialog-wrapper-container{max-height:100vh !important;max-height:100dvh !important;overflow-y:auto !important;}',
     /* 输入框字数计数器（如 "9/10"）在窄屏被压成竖排，禁止换行并禁止收缩 */
     '  .t-input-word-limit{white-space:nowrap !important;flex:0 0 auto !important;}',
-    '}'
+    '}',
+
+    /* --- 图标"气泡"提示：全部隐藏（与断点无关） ---
+     * 站点把顶栏提示做成 mouseenter 触发的小气泡：.toHome「前往贴吧主页」、
+     * .toNav「导航栏」、.menu-text 菜单名。触屏点按会派发 mouseenter，却基本不再派发
+     * mouseleave，于是气泡一直挂在图标下方（真机截图复现）。
+     * .tooltip__popper 是站点通用 tooltip 组件，监听了 click，点图标即弹出带箭头的黑底方块。
+     * 三者都只是提示层，隐藏不影响任何功能。 */
+    '.top-nav-bar .home-left .tb-home .toHome,.top-nav-bar .home-left .tb-home .toNav,.top-nav-bar .menu-item .menu-text{display:none !important;}',
+    '.tooltip__popper{display:none !important;}'
   ].join('\n');
 
   /* ---------------- 帖子内"本吧"卡片 样式 ---------------- */
@@ -506,26 +530,61 @@
 
   /* ---------------- SVG 精灵图守卫 ----------------
    * 贴吧 PC 版的图标全部走内联 SVG 精灵图（<svg id="__SVG_SPRITE_NODE__"> 里几百个 <symbol>，
-   * 页面通过 <use xlink:href="#add_post"> 之类引用）。实测该精灵图会随前端首次挂载注入，
-   * 但 SPA 重新挂载（日志中可见 removeChild(#app) from BODY 出现两次）后不再补注入，
-   * 导致顶栏图标全部空白。这里缓存一次精灵图，发现缺失就补一份（换一个 id 避免与站点冲突）。 */
+   * 页面通过 <use xlink:href="#add_post"> 之类引用）。实测两类故障：
+   *  a) SPA 重新挂载后站点不再补注入 → 引用断链、顶栏图标全空；
+   *  b) 同一页面被【两份本脚本副本】先后 document.write（真机实测：脚本被执行了两次），
+   *     窗口上残留的 window.__SVG_SPRITE__ 实例 isMounted 已为 true，站点重新执行时
+   *     mount() 早退 → symbol 全在但节点永不入档（由 SPRITE_RESET_SRC 从源头避免）。
+   * 这里的轮询做三件事：站点节点在 → 缓存一份（只要 symbol 更全就更新缓存）；
+   * 缺失 → 先用缓存补一份；没有缓存 → 注入页面上下文脚本，把残留实例的游离节点接回文档。 */
   var spriteCache = null;
+  var spriteCacheSym = 0;
   var spriteTimer = null;
+  var lastSpriteRepair = 0;
+
+  /* 沙箱访问不到页面的 window，修复逻辑必须以 <script> 注入页面上下文执行 */
+  var SPRITE_REPAIR_SRC = function () {
+    'use strict';
+    try {
+      var T = window.__SVG_SPRITE__;
+      if (!T || !T.node || !document.body) return false;
+      if (document.getElementById('__SVG_SPRITE_NODE__')) return false;
+      document.body.insertBefore(T.node, document.body.firstChild);
+      return document.contains(T.node);
+    } catch (e) { return false; }
+  }.toString();
+
+  function repairPageSprite() {
+    try {
+      var s = document.createElement('script');
+      s.textContent = '(' + SPRITE_REPAIR_SRC + ')();';
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch (e) { /* 忽略 */ }
+  }
 
   function tickSprite() {
     try {
       syncTitleHeight();
       var cur = document.getElementById('__SVG_SPRITE_NODE__');
       if (cur) {
-        if (!spriteCache) spriteCache = cur.cloneNode(true);
+        var n = cur.querySelectorAll('symbol').length;
+        if (n > 0 && n > spriteCacheSym) { spriteCache = cur.cloneNode(true); spriteCacheSym = n; }
         return;
       }
-      if (!spriteCache || document.getElementById('tbpc-svg-sprite')) return;
-      var c = spriteCache.cloneNode(true);
-      c.id = 'tbpc-svg-sprite';
-      c.setAttribute('aria-hidden', 'true');
-      c.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
-      (document.body || document.documentElement).appendChild(c);
+      if (spriteCache) {
+        if (!document.getElementById('tbpc-svg-sprite')) {
+          var c = spriteCache.cloneNode(true);
+          c.id = 'tbpc-svg-sprite';
+          c.setAttribute('aria-hidden', 'true');
+          c.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+          (document.body || document.documentElement).appendChild(c);
+        }
+        return;
+      }
+      /* 无缓存可补：尝试把页面里那个"已创建但没挂上"的精灵图节点接回来（节流） */
+      var now = Date.now();
+      if (now - lastSpriteRepair > 1500) { lastSpriteRepair = now; repairPageSprite(); }
     } catch (e) { /* 忽略 */ }
   }
 
@@ -541,6 +600,8 @@
     var inject =
       '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=0.5, user-scalable=yes">' +
       '<script>(' + spoofSource + ')();</scr' + 'ipt>' +
+      /* 先复位精灵图单例，防止上一份文档残留的实例让站点挂载早退（详见 SPRITE_RESET_SRC） */
+      '<script>(' + SPRITE_RESET_SRC + ')();</scr' + 'ipt>' +
       '<style>' + RESPONSIVE_CSS + '\n' + FORUM_CARD_CSS + '</style>';
     var m = pcHtml.match(/<head[^>]*>/i);
     var out = m ? pcHtml.replace(m[0], m[0] + inject) : inject + pcHtml;
