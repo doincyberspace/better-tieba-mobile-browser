@@ -6,7 +6,7 @@
 
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](https://creativecommons.org/publicdomain/zero/1.0/deed.zh)
 
-一个 Tampermonkey 脚本，让你的手机浏览器也可以访问电脑端的贴吧网页版。摆脱臃肿的官方客户端，用上电脑网页端实际存在的响应式设计。由 Kimi 和 DeepSeek 编写。
+一个 Tampermonkey 脚本，让你的手机浏览器也可以访问电脑端的贴吧网页版。摆脱臃肿的官方客户端，用上电脑网页端实际存在的响应式设计。由 Kimi、DeepSeek 和 MiMo 编写。
 
 ---
 
