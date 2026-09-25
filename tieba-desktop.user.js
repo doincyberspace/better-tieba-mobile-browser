@@ -164,8 +164,11 @@
     '  }',
     '  .pc-pb-box,.pb-page-wrapper,.frs-page-wrap,.frs-container,.home-page-wrapper{min-width:0 !important;}',
     /* 帖子页吸顶标题条：站点是 margin-left:36px + calc(100vw - 72px)，右侧留 72px 空档，
-     * 内容滚动时会从空档穿出、与标题文字重叠（"导航栏过短"）。改为与容器同宽并给白底。 */
-    '  .pc-pb-title,.pb-title-wrap{margin-left:0 !important;margin-right:0 !important;width:100% !important;max-width:100% !important;box-sizing:border-box !important;background-color:var(--cos-color-bg-raised,#fff) !important;padding-left:10px !important;padding-right:10px !important;}',
+     * 内容滚动时会从空档穿出、与标题文字重叠（"导航栏过短"）。改为与容器同宽并给白底。
+     * 对齐修正：.container 自带 padding-left:10px，标题条再叠 padding-left:10px，
+     * 标题文字缩进到 x=20，而正文起点是 x=10（"标题没与正文对齐"）。
+     * 把标题条左移 -10px 并补足 +20px 宽度，文字起点回到容器内容左缘 x=10，与正文对齐。 */
+    '  .pc-pb-title,.pb-title-wrap{margin-left:-10px !important;margin-right:0 !important;width:calc(100% + 20px) !important;max-width:none !important;box-sizing:border-box !important;background-color:var(--cos-color-bg-raised,#fff) !important;padding-left:10px !important;padding-right:10px !important;}',
     /* 吧页吸顶标签栏：站点依赖滚动时动态加 .is-sticky 才给白底；本内核下该类不生效，
      * 导致标签栏透明、信息流从下方穿出（"导航栏不应无背景"）。直接给白底。 */
     '  .sticky-area{background-color:var(--cos-color-bg-raised,#fff) !important;}',
@@ -237,7 +240,28 @@
     '  .dialog-wrapper-container{max-height:100vh !important;max-height:100dvh !important;overflow-y:auto !important;}',
     /* 输入框字数计数器（如 "9/10"）在窄屏被压成竖排，禁止换行并禁止收缩 */
     '  .t-input-word-limit{white-space:nowrap !important;flex:0 0 auto !important;}',
+
+    /* 消息/通知面板（.message-warp 是全屏 fixed 覆盖层 z-3000）：
+     * 站点 .message-main 写死 width/min-width:500px，393px 视口下右侧被裁 107px
+     * （"通知面板错位"）。放开固定宽度、收窄右栏内边距，并让条目行可收缩，
+     * 互动描述+日期挤在一行内显示（.description 单行省略）。 */
+    '  .message-warp .message-main{width:100% !important;max-width:500px !important;min-width:0 !important;}',
+    '  .message-warp .content-right{padding-left:12px !important;padding-right:12px !important;}',
+    '  .message-warp .like-message-users{height:auto !important;min-height:40px !important;}',
+    '  .message-warp .like-message-user{flex:1 1 auto !important;min-width:0 !important;}',
+    '  .message-warp .like-message-user-info{flex:1 1 auto !important;min-width:0 !important;height:auto !important;min-height:40px !important;}',
+    '  .message-warp .name-detail{min-width:0 !important;}',
+    '  .message-warp .description{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;}',
     '}',
+
+    /* --- 暗色模式文本可读性（WCAG AA 4.5:1 实测，仅 darkmode 下生效） ---
+     * .pname 用户名链接站点给死 #2a438c，在 #161616 底上对比度仅 1.73 → 提亮为 #7aa7ff（≈6.2）。
+     * a.head-name 楼主名是站点内联的 rgb(212,47,36)，在暗底下 3.75 → 提亮为 #ff6152（≈5.2）。
+     * 吧页"全文"展开钮站点内联 color:#4070FF，暗底下 4.41 差一点 → 用站点自己的
+     * 悬停蓝 #547FFF（≈5.19）。三条都只改文字颜色，不动任何布局。 */
+    'html.darkmode .pname{color:#7aa7ff !important;}',
+    'html.darkmode a.head-name[style*="rgb(212, 47, 36)"]{color:#ff6152 !important;}',
+    'html.darkmode span[style*="color: #4070FF"]{color:#547FFF !important;}',
 
     /* --- 图标"气泡"提示：全部隐藏（与断点无关） ---
      * 站点把顶栏提示做成 mouseenter 触发的小气泡：.toHome「前往贴吧主页」、
